@@ -3,9 +3,10 @@ use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
-use crate::utils::file_utils::{open_json, save_json, JsonStructure};
-use serde::{Serialize, Deserialize};
 use super::error::{ExpenseError, ExpenseErrorKind};
+use crate::utils::file_utils::{open_json, save_json, JsonStructure};
+use serde::{Deserialize, Serialize};
+use prettytable::{row, Cell, Row, Table};
 
 #[derive(Serialize, Deserialize)]
 pub struct Expense {
@@ -89,7 +90,7 @@ impl Expense {
             id: id.to_string(),
             description: description.to_string(),
             amount,
-            created_at: datetime
+            created_at: datetime,
         };
 
         //se obtiene la base de datos
@@ -127,6 +128,86 @@ impl Expense {
                 ));
             }
         }
+
+        Ok(())
+    }
+
+    pub fn list() -> Result<(), ExpenseError> {
+        let expeneses_json = match open_json("./DB/expenses.json") {
+            Ok(JsonStructure::Array(vec)) => vec,
+            Ok(JsonStructure::Object(map)) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Error en la estructura del JSON {:?}", map),
+                    "Expense:list",
+                ))
+            }
+            Err(err) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Erros leyendo el archivo JSON {}", err),
+                    "Expense::list",
+                ));
+            }
+        };
+
+        // Crea una tabla para mostrar los datos
+        let mut table = Table::new();
+        table.add_row(row!["ID", "Descripción", "Monto", "Fecha de Creación"]);
+
+        // Agrega cada gasto a la tabla
+        for expense in expeneses_json {
+            let mut fila = vec![];
+            match expense.get("id") {
+                Some(id) => {
+                    fila.push(Cell::new(id.as_str().unwrap_or("N/A")));
+                },
+                None => {}
+            }
+
+            match expense.get("description") {
+                Some(description) => {
+                    fila.push(Cell::new(description.as_str().unwrap_or("N/A")));
+                },
+                None => {}
+            }
+
+            match expense.get("amount") {
+                Some(amount) => {
+                    fila.push(Cell::new(amount.to_string().as_str()));
+                },
+                None => {}
+            }
+
+            match expense.get("created_at") {
+                Some(created_at) => {
+                    let date_format = match created_at.as_str().unwrap().parse::<DateTime<Utc>>() {
+                        Ok(date_format) => date_format,
+                        Err(err) => {
+                            return Err(ExpenseError::new(
+                                ExpenseErrorKind::ReadError, 
+                                &format!("Error leyendo la fecha {}", err), 
+                                "Expense::list"
+                            ));
+                        }
+                    };
+                    fila.push(Cell::new(&date_format.to_string()));
+                },
+                None => {}
+            }
+
+            table.add_row(Row::new(fila));
+        }
+
+                    // table.add_row(Row::new(vec![
+            //     Cell::new(&expense.id),
+            //     Cell::new(&expense.description),
+            //     Cell::new(&format!("{:.2}", expense.amount)),
+            //     Cell::new(&expense.created_at.to_rfc3339()),
+            // ]));
+
+        // Imprime la tabla
+        table.printstd();
 
         Ok(())
     }

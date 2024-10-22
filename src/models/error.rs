@@ -83,6 +83,7 @@ pub enum ExpenseErrorKind {
     CreateError,
     EmptyDescription,
     InvalidAmountType,
+    ReadError
 }
 #[derive(Debug)]
 pub struct ExpenseError {

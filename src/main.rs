@@ -35,6 +35,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 continue; // Continuar con el siguiente ciclo del bucle
             }
         };
+        println!("{:?}", config);
         match config.comando.as_str() {
             "add" => {
                 match Expense::build(&config.descripcion, config.amount) {
@@ -44,7 +45,16 @@ fn run() -> Result<(), Box<dyn Error>> {
                         continue;
                     }
                 }
-            }
+            },
+            "list" => {
+                match Expense::list() {
+                    Ok(_) => {},
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        continue;
+                    }
+                }
+            },
             _ => {
                 return Err(Box::new(ConfigError::new(
                     ConfigErrorKind::InvalidCommand,

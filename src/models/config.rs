@@ -51,6 +51,7 @@ impl Config {
                     })?;
                 } 
             },
+            "list" => {},
             _ => {
                 return Err(ConfigError::new(
                     ConfigErrorKind::InvalidCommand,
