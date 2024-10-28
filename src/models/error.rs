@@ -47,6 +47,7 @@ pub enum ConfigErrorKind {
     InvalidCommand,
     MissingArguments,
     InvalidTypeData,
+    
 }
 
 #[derive(Debug)]
@@ -83,7 +84,11 @@ pub enum ExpenseErrorKind {
     CreateError,
     EmptyDescription,
     InvalidAmountType,
-    ReadError
+    ReadError,
+    IdsErrorType,
+    WriteError,
+    InvalidDateFormat,
+    InvalidMonth
 }
 #[derive(Debug)]
 pub struct ExpenseError {

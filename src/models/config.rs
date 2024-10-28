@@ -13,6 +13,8 @@ impl Config {
         let mut descripcion = String::new();
         let mut description_flag = false;
         let mut amount_flag = false;
+        let mut id_delete_flag = false;
+        let mut month_flag = false;
         let mut amount: f64 = 0.0;
         let comando = parts
             .next()
@@ -52,6 +54,34 @@ impl Config {
                 } 
             },
             "list" => {},
+            "summary" => loop {
+                let item = parts.next();
+                if item.is_none() {
+                    break;
+                }
+                let item = item.unwrap();
+                if item == "--month" {
+                    month_flag = true;
+                } else if month_flag {
+                    descripcion.push_str(item);
+                }
+            },
+            "delete" => loop {
+                let item = parts.next();
+                if item.is_none() {
+                    break;
+                }
+                let item = item.unwrap();
+
+                if item == "--id" {
+                    id_delete_flag = true;
+                } else if id_delete_flag {
+                    if !descripcion.is_empty() {
+                        descripcion.push(' ');
+                    }
+                    descripcion.push_str(item);
+                }
+            }
             _ => {
                 return Err(ConfigError::new(
                     ConfigErrorKind::InvalidCommand,

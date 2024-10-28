@@ -7,7 +7,7 @@ use std::{
 use expense_tracker::{
     models::{
         config::Config,
-        error::{ConfigError, ConfigErrorKind}, expense::Expense,
+        expense::Expense,
     },
     utils::io_utils::leer_data,
 };
@@ -35,11 +35,12 @@ fn run() -> Result<(), Box<dyn Error>> {
                 continue; // Continuar con el siguiente ciclo del bucle
             }
         };
-        println!("{:?}", config);
         match config.comando.as_str() {
             "add" => {
                 match Expense::build(&config.descripcion, config.amount) {
-                    Ok(_) => {},
+                    Ok(_) => {
+                        println!("Expense added successfully")
+                    },
                     Err(err) => {
                         eprintln!("{}", err);
                         continue;
@@ -55,11 +56,29 @@ fn run() -> Result<(), Box<dyn Error>> {
                     }
                 }
             },
+            "summary" => {
+                match Expense::summary(&config.descripcion) {
+                    Ok(_) => {},
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        continue;
+                    }
+                }
+            },
+            "delete" => {
+                match Expense::delete(&config.descripcion) {
+                    Ok(_) => {
+                        println!("Expense deleted successfully")
+                    },
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        continue;
+                    }
+                }
+            }
             _ => {
-                return Err(Box::new(ConfigError::new(
-                    ConfigErrorKind::InvalidCommand,
-                    "Comando invalido",
-                )))
+                eprintln!("Error: Comando invalido");
+                continue;
             }
         }
     }

@@ -1,12 +1,12 @@
 use std::time::SystemTime;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Local, NaiveDateTime, Utc};
 use serde_json::json;
 
 use super::error::{ExpenseError, ExpenseErrorKind};
 use crate::utils::file_utils::{open_json, save_json, JsonStructure};
-use serde::{Deserialize, Serialize};
 use prettytable::{row, Cell, Row, Table};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Expense {
@@ -161,53 +161,190 @@ impl Expense {
             match expense.get("id") {
                 Some(id) => {
                     fila.push(Cell::new(id.as_str().unwrap_or("N/A")));
-                },
+                }
                 None => {}
             }
 
             match expense.get("description") {
                 Some(description) => {
                     fila.push(Cell::new(description.as_str().unwrap_or("N/A")));
-                },
+                }
                 None => {}
             }
 
             match expense.get("amount") {
                 Some(amount) => {
                     fila.push(Cell::new(amount.to_string().as_str()));
-                },
+                }
                 None => {}
             }
 
             match expense.get("created_at") {
                 Some(created_at) => {
                     let date_format = match created_at.as_str().unwrap().parse::<DateTime<Utc>>() {
-                        Ok(date_format) => date_format,
+                        Ok(date_format) => {
+                            let local_time = date_format.with_timezone(&Local);
+                            local_time.format("%Y-%m-%d %H:%M:%S").to_string()
+                        }
                         Err(err) => {
                             return Err(ExpenseError::new(
-                                ExpenseErrorKind::ReadError, 
-                                &format!("Error leyendo la fecha {}", err), 
-                                "Expense::list"
+                                ExpenseErrorKind::ReadError,
+                                &format!("Error leyendo la fecha {}", err),
+                                "Expense::list",
                             ));
                         }
                     };
                     fila.push(Cell::new(&date_format.to_string()));
-                },
+                }
                 None => {}
             }
 
             table.add_row(Row::new(fila));
         }
 
-                    // table.add_row(Row::new(vec![
-            //     Cell::new(&expense.id),
-            //     Cell::new(&expense.description),
-            //     Cell::new(&format!("{:.2}", expense.amount)),
-            //     Cell::new(&expense.created_at.to_rfc3339()),
-            // ]));
-
         // Imprime la tabla
         table.printstd();
+
+        Ok(())
+    }
+
+    pub fn summary(description: &str) -> Result<(), ExpenseError> {
+        let expeneses_json = match open_json("./DB/expenses.json") {
+            Ok(JsonStructure::Array(vec)) => vec,
+            Ok(JsonStructure::Object(map)) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Error en la estructura del JSON {:?}", map),
+                    "Expense:list",
+                ))
+            }
+            Err(err) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Erros leyendo el archivo JSON {}", err),
+                    "Expense::list",
+                ));
+            }
+        };
+
+        let mut total: f64 = 0.0;
+
+        if description == "" {
+            for expense in expeneses_json {
+                match expense.get("amount") {
+                    Some(amount) => total = amount.as_f64().unwrap_or(0.0) + total,
+                    None => {}
+                }
+            }
+        } else {
+            for expense in expeneses_json {
+                match expense.get("created_at") {
+                    Some(created_at) => {
+                        if let Some(date_str) = created_at.as_str() {
+                            // Parseamos la fecha en formato YYYY-MM-DD
+                            match NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.fZ") {
+                                Ok(date) => {
+                                    let month = date.month(); // Extraemos el mes
+                                    let description_month = match description.parse::<u32>() {
+                                        Ok(num) => num,
+                                        Err(err) => {
+                                            return Err(ExpenseError::new(
+                                                ExpenseErrorKind::InvalidMonth,
+                                                &format!("Formato de mes no valido {:?}", err),
+                                                "Expense::summary",
+                                            ));
+                                        }
+                                    };
+
+                                    if description_month < 1 || description_month > 12 {
+                                        return Err(ExpenseError::new(
+                                            ExpenseErrorKind::InvalidMonth,
+                                            &format!("Mes no valido"),
+                                            "Expense::summary",
+                                        ));
+                                    }
+
+                                    if month == description_month {
+                                        match expense.get("amount") {
+                                            Some(amount) => {
+                                                total = amount.as_f64().unwrap_or(0.0) + total
+                                            }
+                                            None => {}
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    return Err(ExpenseError::new(
+                                        ExpenseErrorKind::InvalidDateFormat,
+                                        &format!(
+                                            "Formato de fecha no válido: {:?}, Error: {:?}",
+                                            date_str, err
+                                        ),
+                                        "Expense::summary",
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    None => {}
+                }
+            }
+        }
+
+        println!("Total expenses: ${total}");
+
+        Ok(())
+    }
+
+    pub fn delete(ids_string: &str) -> Result<(), ExpenseError> {
+        let ids: Vec<String> = ids_string.split_whitespace().map(String::from).collect();
+        //se abre el archivo json
+        let mut expeneses_json = match open_json("./DB/expenses.json") {
+            Ok(JsonStructure::Array(vec)) => vec,
+            Ok(JsonStructure::Object(map)) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Error en la estructura del JSON {:?}", map),
+                    "Expense:delete",
+                ))
+            }
+            Err(err) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::ReadError,
+                    &format!("Erros leyendo el archivo JSON {}", err),
+                    "Expense::delete",
+                ));
+            }
+        };
+
+        expeneses_json.retain(|expense| {
+            if let Some(id) = expense.get("id") {
+                if let Some(id_str) = id.as_str() {
+                    println!("{:?}", id_str);
+                    println!("{:?}", ids);
+                    !ids.contains(&id_str.to_string())
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        });
+
+        println!("{:?}", expeneses_json);
+
+        let json_structure = JsonStructure::Array(expeneses_json);
+
+        match save_json("./DB/expenses.json", json_structure) {
+            Ok(_) => (),
+            Err(err) => {
+                return Err(ExpenseError::new(
+                    ExpenseErrorKind::WriteError,
+                    &format!("Error escribiendo los datos {}", err),
+                    "Expense:delete",
+                ));
+            }
+        }
 
         Ok(())
     }
